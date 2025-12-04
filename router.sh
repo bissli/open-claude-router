@@ -37,6 +37,13 @@ start() {
 
     if [ $? -eq 0 ]; then
         echo "Router started at http://localhost:${PORT}"
+        echo "Waiting for startup..."
+        sleep 2
+        echo ""
+        echo "=== Recent logs ==="
+        docker logs --tail 10 "$CONTAINER_NAME"
+        echo ""
+        echo "Follow logs: $0 logs -f"
     else
         echo "Failed to start router"
         return 1
@@ -78,9 +85,9 @@ logs() {
     fi
 
     if [ "$1" = "-f" ]; then
-        docker logs -f "$CONTAINER_NAME"
+        docker logs -f --timestamps "$CONTAINER_NAME"
     else
-        docker logs --tail 50 "$CONTAINER_NAME"
+        docker logs --tail 50 --timestamps "$CONTAINER_NAME"
     fi
 }
 

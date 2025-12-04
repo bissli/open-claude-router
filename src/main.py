@@ -1,5 +1,8 @@
 """FastAPI application for open-claude-router."""
 
+import logging
+from contextlib import asynccontextmanager
+
 import httpx
 import uvicorn
 from fastapi import FastAPI, Header, Request, Response
@@ -9,10 +12,23 @@ from .config import config
 from .stream import stream_openai_to_anthropic
 from .transform import anthropic_to_openai, count_tokens, openai_to_anthropic
 
+logger = logging.getLogger('uvicorn.error')
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Log startup configuration."""
+    logger.info(f'Router ready on {config.host}:{config.port}')
+    if config.model_override:
+        logger.info(f'Model override: {config.model_override}')
+    yield
+
+
 app = FastAPI(
     title='Open Claude Router',
     description='API proxy that translates Anthropic Claude API to OpenAI-compatible APIs',
     version='1.0.0',
+    lifespan=lifespan,
 )
 
 
@@ -68,8 +84,12 @@ async def messages(
             content={'error': {'message': 'API key required'}},
         )
 
+    requested_model = body.get('model', 'unknown')
     openai_request = anthropic_to_openai(body, config.model_override)
+    mapped_model = openai_request['model']
     is_streaming = openai_request.get('stream', False)
+
+    logger.info(f'Request: {requested_model} -> {mapped_model} (stream={is_streaming})')
 
     headers = {
         'Authorization': f'Bearer {api_key}',
@@ -89,6 +109,7 @@ async def messages(
                 ) as response:
                     if not response.is_success:
                         error_text = await response.aread()
+                        logger.error(f'Upstream error {response.status_code}: {error_text.decode()[:200]}')
                         yield f'data: {{"error": "{error_text.decode()}"}}\n\n'
                         return
 
@@ -115,6 +136,7 @@ async def messages(
             )
 
             if not response.is_success:
+                logger.error(f'Upstream error {response.status_code}: {response.text[:200]}')
                 return JSONResponse(
                     status_code=response.status_code,
                     content={'error': {'message': response.text}},

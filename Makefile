@@ -12,9 +12,13 @@ help:
 	@echo "  make logs       Show recent logs"
 	@echo "  make logs-f     Follow logs in real-time"
 	@echo "  make test       Run tests"
-	@echo "  make build      Build Docker image"
-	@echo "  make run        Run with Docker"
-	@echo "  make clean      Clean up generated files"
+	@echo "  make build         Build Docker image"
+	@echo "  make run           Run with Docker"
+	@echo "  make docker-up     Start with docker-compose"
+	@echo "  make docker-down   Stop docker-compose"
+	@echo "  make docker-logs   Show Docker logs"
+	@echo "  make docker-logs-f Follow Docker logs"
+	@echo "  make clean         Clean up generated files"
 
 # Installation
 install:
@@ -70,9 +74,16 @@ run:
 
 docker-up:
 	docker-compose up -d
+	@echo "Logs: make docker-logs-f"
 
 docker-down:
 	docker-compose down
+
+docker-logs:
+	docker-compose logs --tail 50
+
+docker-logs-f:
+	docker-compose logs -f
 
 # Cleanup
 clean:
