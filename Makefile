@@ -16,9 +16,10 @@ help:
 	@echo "  make run           Run with Docker"
 	@echo "  make docker-up     Start with docker-compose"
 	@echo "  make docker-down   Stop docker-compose"
-	@echo "  make docker-logs   Show Docker logs"
-	@echo "  make docker-logs-f Follow Docker logs"
-	@echo "  make clean         Clean up generated files"
+	@echo "  make docker-logs    Show Docker logs"
+	@echo "  make docker-logs-f  Follow Docker logs"
+	@echo "  make docker-clean   Remove container and image"
+	@echo "  make clean          Clean up generated files"
 
 # Installation
 install:
@@ -84,6 +85,10 @@ docker-logs:
 
 docker-logs-f:
 	docker-compose logs -f
+
+docker-clean:
+	docker-compose down --rmi local
+	@echo "Container and image removed"
 
 # Cleanup
 clean:

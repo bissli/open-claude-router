@@ -1,14 +1,15 @@
 #!/bin/bash
 #
-# open-claude-router - Start/stop the router Docker container
+# open-claude-router - Manage the router Docker container
 #
 # Usage:
-#   router.sh start    Start the router
+#   router.sh start    Start the router (builds image if needed)
 #   router.sh stop     Stop the router
 #   router.sh restart  Restart the router
 #   router.sh status   Check if running
 #   router.sh logs     Show recent logs
 #   router.sh logs -f  Follow logs
+#   router.sh clean    Remove container and image
 #
 
 CONTAINER_NAME="open-claude-router"
@@ -19,6 +20,16 @@ start() {
     if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
         echo "Router is already running"
         return 0
+    fi
+
+    # Build image if it doesn't exist
+    if ! docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
+        echo "Building image..."
+        docker build -t "$IMAGE_NAME" .
+        if [ $? -ne 0 ]; then
+            echo "Build failed"
+            return 1
+        fi
     fi
 
     # Remove stopped container if exists
@@ -91,8 +102,19 @@ logs() {
     fi
 }
 
+clean() {
+    echo "Stopping container..."
+    docker stop "$CONTAINER_NAME" 2>/dev/null
+    docker rm "$CONTAINER_NAME" 2>/dev/null
+
+    echo "Removing image..."
+    docker rmi "$IMAGE_NAME" 2>/dev/null
+
+    echo "Cleaned"
+}
+
 usage() {
-    echo "Usage: $0 {start|stop|restart|status|logs [-f]}"
+    echo "Usage: $0 {start|stop|restart|status|logs [-f]|clean}"
     echo ""
     echo "Environment variables:"
     echo "  OPENROUTER_API_KEY    Your OpenRouter API key (required)"
@@ -115,6 +137,9 @@ case "$1" in
         ;;
     logs)
         logs "$2"
+        ;;
+    clean)
+        clean
         ;;
     *)
         usage
