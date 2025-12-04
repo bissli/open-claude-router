@@ -268,6 +268,104 @@ class TestAnthropicToOpenAI:
 
         assert result['reasoning'] == {'max_tokens': 5000}
 
+    def test_no_reasoning_when_not_requested(self):
+        """Reasoning is not added when neither reasoning nor thinking is specified.
+        """
+        body = {
+            'model': 'claude-3-5-sonnet',
+            'messages': [{'role': 'user', 'content': 'Hello'}],
+        }
+        result = anthropic_to_openai(body)
+
+        assert 'reasoning' not in result
+
+    def test_max_tokens_passthrough(self):
+        """max_tokens is passed through to OpenAI format.
+        """
+        body = {
+            'model': 'claude-3-5-sonnet',
+            'messages': [{'role': 'user', 'content': 'Hello'}],
+            'max_tokens': 4096,
+        }
+        result = anthropic_to_openai(body)
+
+        assert result['max_tokens'] == 4096
+
+    def test_top_p_passthrough(self):
+        """top_p is passed through to OpenAI format.
+        """
+        body = {
+            'model': 'claude-3-5-sonnet',
+            'messages': [{'role': 'user', 'content': 'Hello'}],
+            'top_p': 0.9,
+        }
+        result = anthropic_to_openai(body)
+
+        assert result['top_p'] == 0.9
+
+    def test_top_k_passthrough(self):
+        """top_k is passed through to OpenAI format.
+        """
+        body = {
+            'model': 'claude-3-5-sonnet',
+            'messages': [{'role': 'user', 'content': 'Hello'}],
+            'top_k': 40,
+        }
+        result = anthropic_to_openai(body)
+
+        assert result['top_k'] == 40
+
+    def test_stop_sequences_to_stop(self):
+        """stop_sequences is converted to stop in OpenAI format.
+        """
+        body = {
+            'model': 'claude-3-5-sonnet',
+            'messages': [{'role': 'user', 'content': 'Hello'}],
+            'stop_sequences': ['\n\nHuman:', '\n\nAssistant:'],
+        }
+        result = anthropic_to_openai(body)
+
+        assert result['stop'] == ['\n\nHuman:', '\n\nAssistant:']
+
+    def test_tool_choice_auto(self):
+        """tool_choice type=auto converts to string 'auto'.
+        """
+        body = {
+            'model': 'claude-3-5-sonnet',
+            'messages': [{'role': 'user', 'content': 'Hello'}],
+            'tool_choice': {'type': 'auto'},
+        }
+        result = anthropic_to_openai(body)
+
+        assert result['tool_choice'] == 'auto'
+
+    def test_tool_choice_any(self):
+        """tool_choice type=any converts to string 'required'.
+        """
+        body = {
+            'model': 'claude-3-5-sonnet',
+            'messages': [{'role': 'user', 'content': 'Hello'}],
+            'tool_choice': {'type': 'any'},
+        }
+        result = anthropic_to_openai(body)
+
+        assert result['tool_choice'] == 'required'
+
+    def test_tool_choice_specific_tool(self):
+        """tool_choice type=tool converts to OpenAI function format.
+        """
+        body = {
+            'model': 'claude-3-5-sonnet',
+            'messages': [{'role': 'user', 'content': 'Hello'}],
+            'tool_choice': {'type': 'tool', 'name': 'get_weather'},
+        }
+        result = anthropic_to_openai(body)
+
+        assert result['tool_choice'] == {
+            'type': 'function',
+            'function': {'name': 'get_weather'},
+            }
+
 
 class TestOpenAIToAnthropic:
     """Tests for OpenAI to Anthropic response conversion."""

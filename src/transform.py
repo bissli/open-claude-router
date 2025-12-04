@@ -70,6 +70,11 @@ def anthropic_to_openai(body: dict, model_override: str | None = None) -> dict:
     reasoning = body.get('reasoning')
     reasoning_effort = body.get('reasoning_effort')
     thinking = body.get('thinking')
+    max_tokens = body.get('max_tokens')
+    top_p = body.get('top_p')
+    top_k = body.get('top_k')
+    stop_sequences = body.get('stop_sequences')
+    tool_choice = body.get('tool_choice')
 
     system_messages: list[dict] = []
     if isinstance(system, str):
@@ -152,15 +157,40 @@ def anthropic_to_openai(body: dict, model_override: str | None = None) -> dict:
     if temperature is not None:
         result['temperature'] = temperature
 
+    if max_tokens is not None:
+        result['max_tokens'] = max_tokens
+
+    if top_p is not None:
+        result['top_p'] = top_p
+
+    if top_k is not None:
+        result['top_k'] = top_k
+
+    if stop_sequences:
+        result['stop'] = stop_sequences
+
     if reasoning:
         result['reasoning'] = reasoning
     elif thinking and thinking.get('type') == 'enabled':
         result['reasoning'] = {'max_tokens': thinking.get('budget_tokens')}
-    else:
-        result['reasoning'] = {'effort': 'high'}
 
     if reasoning_effort:
         result['reasoning_effort'] = reasoning_effort
+
+    if tool_choice:
+        if isinstance(tool_choice, dict):
+            tc_type = tool_choice.get('type')
+            if tc_type == 'auto':
+                result['tool_choice'] = 'auto'
+            elif tc_type == 'any':
+                result['tool_choice'] = 'required'
+            elif tc_type == 'tool':
+                result['tool_choice'] = {
+                    'type': 'function',
+                    'function': {'name': tool_choice.get('name')},
+                    }
+        else:
+            result['tool_choice'] = tool_choice
 
     if tools:
         result['tools'] = [
