@@ -17,7 +17,12 @@ logger = logging.getLogger('uvicorn.error')
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Log startup configuration."""
+    """Initialize models and log startup configuration."""
+    from .models import fetch_models, get_claude_aliases
+
+    await fetch_models()
+    aliases = get_claude_aliases()
+    logger.info(f'Loaded {len(aliases)} Claude aliases: {aliases}')
     logger.info(f'Router ready on {config.host}:{config.port}')
     if config.model_override:
         logger.info(f'Model override: {config.model_override}')

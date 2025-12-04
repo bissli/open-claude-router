@@ -1,7 +1,7 @@
 """Integration tests for API endpoints."""
 
 import json
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 import src.models as models_module
@@ -21,6 +21,50 @@ def mock_claude_aliases():
     }
     yield
     models_module._claude_aliases = None
+
+
+class TestStartupLifespan:
+    """Tests for application startup behavior."""
+
+    def test_fetch_models_called_on_startup(self):
+        """Verify fetch_models is called during app lifespan startup."""
+        with patch.object(
+            models_module, 'fetch_models', new_callable=AsyncMock
+        ) as mock_fetch:
+            with TestClient(app):
+                pass
+            mock_fetch.assert_called_once()
+
+    def test_aliases_populated_after_startup(self, httpx_mock: HTTPXMock):
+        """Verify Claude aliases are available after startup."""
+        # Clear the cache to simulate fresh startup
+        models_module._claude_aliases = None
+        models_module._cached_models = None
+
+        # Mock the OpenRouter API response
+        httpx_mock.add_response(
+            url='https://openrouter.ai/api/v1/models',
+            json={
+                'data': [
+                    {'id': 'anthropic/claude-opus-4.5', 'created': 1700000003},
+                    {'id': 'anthropic/claude-sonnet-4.5', 'created': 1700000002},
+                    {'id': 'anthropic/claude-haiku-4.5', 'created': 1700000001},
+                ]
+            },
+        )
+
+        # Remove the autouse fixture's mock for this test
+        with patch.object(
+            models_module, '_claude_aliases', None
+        ), patch.object(
+            models_module, '_cached_models', None
+        ):
+            with TestClient(app):
+                aliases = models_module.get_claude_aliases()
+                assert 'opus' in aliases
+                assert 'sonnet' in aliases
+                assert 'haiku' in aliases
+                assert aliases['opus'] == 'anthropic/claude-opus-4.5'
 
 
 @pytest.fixture

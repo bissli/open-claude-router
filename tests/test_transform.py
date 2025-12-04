@@ -90,17 +90,20 @@ class TestMapModel:
         """
         assert map_model('claude-3-haiku') == 'anthropic/claude-haiku-4.5'
         assert map_model('claude-3-5-haiku-20241022') == 'anthropic/claude-haiku-4.5'
+        assert map_model('claude-haiku-4-5-20250514') == 'anthropic/claude-haiku-4.5'
 
     def test_map_sonnet(self):
         """Sonnet aliases map to newest sonnet model.
         """
         assert map_model('claude-3-5-sonnet') == 'anthropic/claude-sonnet-4.5'
         assert map_model('claude-sonnet-4') == 'anthropic/claude-sonnet-4.5'
+        assert map_model('claude-sonnet-4-5-20250514') == 'anthropic/claude-sonnet-4.5'
 
     def test_map_opus(self):
         """Opus aliases map to newest opus model.
         """
         assert map_model('claude-3-opus') == 'anthropic/claude-opus-4.5'
+        assert map_model('claude-opus-4-5-20251101') == 'anthropic/claude-opus-4.5'
 
     def test_unknown_model_passthrough(self):
         """Unknown models pass through unchanged.
