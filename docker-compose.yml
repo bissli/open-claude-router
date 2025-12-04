@@ -1,0 +1,18 @@
+services:
+  open-claude-router:
+    build: .
+    ports:
+      - "8787:8787"
+    environment:
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      - MODEL_OVERRIDE=${MODEL_OVERRIDE:-}
+      - HOST=0.0.0.0
+      - PORT=8787
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8787/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
