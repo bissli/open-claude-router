@@ -16,7 +16,7 @@ class Config:
         'OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1'
     )
     openrouter_api_key: str | None = os.getenv('OPENROUTER_API_KEY')
-    model_override: str | None = os.getenv('MODEL_OVERRIDE')
+    model_override: str | None = os.getenv('MODEL_OVERRIDE') or None
     host: str = os.getenv('HOST', '0.0.0.0')
     port: int = int(os.getenv('PORT', '8787'))
 
