@@ -1,0 +1,33 @@
+[tool.poetry]
+name = "open-claude-router"
+version = "1.0.0"
+description = "API proxy that translates Anthropic Claude API to OpenAI-compatible APIs"
+authors = ["bissli"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+fastapi = "^0.115.0"
+httpx = "^0.28.0"
+uvicorn = "^0.34.0"
+python-dotenv = "^1.0.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+pytest-asyncio = "^0.24.0"
+pytest-httpx = "^0.35.0"
+
+[tool.poetry.scripts]
+open-claude-router = "src.main:run"
+router = "src.cli:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+asyncio_default_fixture_loop_scope = "function"
