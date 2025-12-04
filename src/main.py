@@ -99,6 +99,8 @@ async def messages(
     headers = {
         'Authorization': f'Bearer {api_key}',
         'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://github.com/tkellogg/open-claude-router',
+        'X-Title': 'Open Claude Router',
     }
     url = f'{config.openrouter_base_url}/chat/completions'
 
