@@ -16,8 +16,18 @@ def mock_claude_aliases():
         'sonnet': 'anthropic/claude-sonnet-4.5',
         'opus': 'anthropic/claude-opus-4.5',
     }
+    models_module._model_params = {
+        'anthropic/claude-sonnet-4.5': {
+            'max_tokens', 'temperature', 'top_p', 'top_k', 'stop',
+            'tools', 'tool_choice', 'reasoning',
+        },
+        'openai/gpt-5.1': {
+            'max_tokens', 'stop', 'tools', 'tool_choice', 'reasoning',
+        },
+    }
     yield
     models_module._claude_aliases = None
+    models_module._model_params = None
 
 
 class TestBuildClaudeAliases:
@@ -437,6 +447,70 @@ class TestOpenAIToAnthropic:
         assert result['content'][0]['thinking'] == 'Let me think about this...'
         assert result['content'][1]['type'] == 'text'
         assert result['content'][1]['text'] == 'The answer is 42.'
+
+
+class TestParameterFiltering:
+    """Tests for filtering unsupported parameters."""
+
+    def test_claude_model_keeps_all_params(self):
+        """Claude models support temperature, top_p, etc.
+        """
+        body = {
+            'model': 'claude-3-5-sonnet',
+            'messages': [{'role': 'user', 'content': 'Hello'}],
+            'temperature': 0.7,
+            'top_p': 0.9,
+            'max_tokens': 1000,
+        }
+        result = anthropic_to_openai(body)
+
+        assert result['temperature'] == 0.7
+        assert result['top_p'] == 0.9
+        assert result['max_tokens'] == 1000
+
+    def test_openai_model_filters_unsupported_params(self):
+        """OpenAI models don't support temperature/top_p in some cases.
+        """
+        body = {
+            'model': 'claude-3-5-sonnet',
+            'messages': [{'role': 'user', 'content': 'Hello'}],
+            'temperature': 0.7,
+            'top_p': 0.9,
+            'max_tokens': 1000,
+        }
+        result = anthropic_to_openai(body, model_override='openai/gpt-5.1')
+
+        assert 'temperature' not in result
+        assert 'top_p' not in result
+        assert result['max_tokens'] == 1000
+
+    def test_unknown_model_passes_all_params(self):
+        """Unknown models pass through all params (no filtering).
+        """
+        body = {
+            'model': 'claude-3-5-sonnet',
+            'messages': [{'role': 'user', 'content': 'Hello'}],
+            'temperature': 0.7,
+            'top_p': 0.9,
+        }
+        result = anthropic_to_openai(body, model_override='unknown/model')
+
+        assert result['temperature'] == 0.7
+        assert result['top_p'] == 0.9
+
+    def test_always_keeps_model_messages_stream(self):
+        """model, messages, and stream are always kept.
+        """
+        body = {
+            'model': 'claude-3-5-sonnet',
+            'messages': [{'role': 'user', 'content': 'Hello'}],
+            'stream': True,
+        }
+        result = anthropic_to_openai(body, model_override='openai/gpt-5.1')
+
+        assert result['model'] == 'openai/gpt-5.1'
+        assert len(result['messages']) == 1
+        assert result['stream'] is True
 
 
 class TestCountTokens:

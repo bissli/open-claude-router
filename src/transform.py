@@ -1,10 +1,13 @@
 """Transform requests/responses between Anthropic and OpenAI formats."""
 
 import json
+import logging
 import time
 from typing import Any
 
-from .models import map_model
+from .models import get_supported_params, map_model
+
+logger = logging.getLogger('uvicorn.error')
 
 
 def _validate_tool_calls(messages: list[dict]) -> list[dict]:
@@ -57,6 +60,31 @@ def _validate_tool_calls(messages: list[dict]) -> list[dict]:
             validated.append(current)
 
     return validated
+
+
+ALWAYS_ALLOWED = {'model', 'messages', 'stream'}
+
+
+def _filter_unsupported_params(request: dict, model: str) -> dict:
+    """Filter request to only include parameters supported by the model.
+
+    Always keeps 'model', 'messages', 'stream'. Other params are filtered
+    based on OpenRouter's supported_parameters for that model.
+    """
+    supported = get_supported_params(model)
+    if supported is None:
+        return request  # Model not in cache, pass through
+
+    filtered = {}
+    dropped = []
+    for key, value in request.items():
+        if key in ALWAYS_ALLOWED or key in supported:
+            filtered[key] = value
+        else:
+            dropped.append(key)
+    if dropped:
+        logger.info(f'Filtered unsupported params for {model}: {dropped}')
+    return filtered
 
 
 def anthropic_to_openai(body: dict, model_override: str | None = None) -> dict:
@@ -205,7 +233,7 @@ def anthropic_to_openai(body: dict, model_override: str | None = None) -> dict:
             for t in tools
         ]
 
-    return result
+    return _filter_unsupported_params(result, model)
 
 
 def openai_to_anthropic(data: dict, model: str) -> dict:

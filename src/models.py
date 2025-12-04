@@ -9,6 +9,7 @@ CLAUDE_TIERS = ('haiku', 'sonnet', 'opus')
 
 _cached_models: dict | None = None
 _claude_aliases: dict[str, str] | None = None
+_model_params: dict[str, set[str]] | None = None
 
 
 def _extract_claude_tier(model_id: str) -> str | None:
@@ -47,15 +48,27 @@ def _build_claude_aliases(models_data: dict) -> dict[str, str]:
     return aliases
 
 
+def _build_model_params(models_data: dict) -> dict[str, set[str]]:
+    """Build mapping from model ID to supported parameters."""
+    params: dict[str, set[str]] = {}
+    for model in models_data.get('data', []):
+        model_id = model.get('id', '')
+        supported = model.get('supported_parameters', [])
+        if model_id and supported:
+            params[model_id] = set(supported)
+    return params
+
+
 async def fetch_models() -> dict:
     """Fetch models from OpenRouter API and build Claude aliases.
     """
-    global _cached_models, _claude_aliases
+    global _cached_models, _claude_aliases, _model_params
     async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.get(OPENROUTER_MODELS_URL)
         response.raise_for_status()
         _cached_models = response.json()
     _claude_aliases = _build_claude_aliases(_cached_models)
+    _model_params = _build_model_params(_cached_models)
     return _cached_models
 
 
@@ -81,6 +94,16 @@ def get_model_ids() -> set[str]:
     if _cached_models is None:
         return set()
     return {m['id'] for m in _cached_models.get('data', [])}
+
+
+def get_supported_params(model_id: str) -> set[str] | None:
+    """Get supported parameters for a model (sync, uses cache only).
+
+    Returns None if model not found, empty set if no params listed.
+    """
+    if _model_params is None:
+        return None
+    return _model_params.get(model_id)
 
 
 def map_model(anthropic_model: str) -> str:
