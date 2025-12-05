@@ -1,10 +1,13 @@
 """Streaming SSE transformation from OpenAI to Anthropic format."""
 
 import json
+import logging
 import time
 from collections.abc import AsyncIterator
 
 import httpx
+
+logger = logging.getLogger('uvicorn.error')
 
 
 def _sse_event(event_type: str, data: dict) -> str:

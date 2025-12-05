@@ -19,6 +19,7 @@ logger = logging.getLogger('uvicorn.error')
 
 # Statsig cache path for serving cached evaluations
 STATSIG_CACHE_DIR = Path.home() / '.claude' / 'statsig'
+STATSIG_RESPONSE_FILE = Path(__file__).parent / 'statsig_response.json'
 
 
 @asynccontextmanager
@@ -222,24 +223,37 @@ async def list_models() -> JSONResponse:
 # Statsig stub endpoints - bypass telemetry validation
 # ============================================================================
 
-def _load_cached_statsig() -> dict | None:
-    """Load cached statsig evaluations if available."""
+def _load_statsig_response() -> dict | None:
+    """Load statsig response from bundled file or user cache."""
+    # First try bundled response file
+    if STATSIG_RESPONSE_FILE.exists():
+        try:
+            with STATSIG_RESPONSE_FILE.open() as f:
+                return json.load(f)
+        except Exception as e:
+            logger.warning(f'Failed to load bundled statsig response: {e}')
+
+    # Fall back to user's cached evaluations
     try:
         for cache_file in STATSIG_CACHE_DIR.glob('statsig.cached.evaluations.*'):
             with Path(cache_file).open() as f:
                 cached = json.load(f)
                 if 'data' in cached:
                     return json.loads(cached['data'])
-        return None
     except Exception as e:
         logger.warning(f'Failed to load statsig cache: {e}')
-        return None
+
+    return None
 
 
 def _make_statsig_response(user: dict | None = None) -> dict:
     """Generate a valid statsig initialize response."""
-    cached = _load_cached_statsig()
+    cached = _load_statsig_response()
     if cached:
+        # Update timestamp to current time
+        cached['time'] = int(time.time() * 1000)
+        if user:
+            cached['evaluated_keys'] = user
         return cached
 
     # Minimal valid response if no cache
