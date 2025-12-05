@@ -1,152 +1,137 @@
 # open-claude-router
 
-An API proxy that translates between Anthropic's Claude API and OpenAI-compatible APIs, enabling you to use Claude Code with OpenRouter and other OpenAI-compatible providers.
-
-## Features
-
-- **Local-First**: Designed to run locally on your machine for maximum privacy and control.
-- **Model Override**: Force specific models (like Grok, Gemini, etc.) via environment variables without changing Claude Code settings.
-- **API Key Override**: Use a separate OpenRouter API key for the router while keeping your Anthropic key in Claude Code settings.
-- **Reasoning Support**: Full support for OpenRouter's reasoning capabilities (e.g., DeepSeek R1).
-- **Dynamic Models**: Fetches available models directly from OpenRouter API.
+An API proxy that lets you run Claude Code with OpenRouter (or any OpenAI-compatible provider) instead of a direct Anthropic API key.
 
 ## Quick Start
 
-### 1. Installation
+### 1. Configure Claude Code
+
+Add to `~/.claude/settings.json`:
+
+```json
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "http://localhost:8787",
+    "NODE_TLS_REJECT_UNAUTHORIZED": "0",
+    "ANTHROPIC_API_KEY": "sk-ant-fake-key"
+  }
+}
+```
+
+### 2. Set Your OpenRouter API Key
 
 ```bash
-# Clone the repository
-git clone https://github.com/bissli/open-claude-router.git
+export OPENROUTER_API_KEY="sk-or-v1-..."
+```
+
+Get your key from [openrouter.ai/keys](https://openrouter.ai/keys).
+
+### 3. Start the Router
+
+```bash
+git clone https://github.com/tkellogg/open-claude-router.git
 cd open-claude-router
-
-# Install with Poetry (Python 3.10+)
-poetry install
+./router start
 ```
 
-### 2. Configuration
-
-Create a `.env` file in the project root:
-
-```ini
-# Your OpenRouter API Key
-OPENROUTER_API_KEY=sk-or-...
-
-# Force the router to use this model (optional)
-MODEL_OVERRIDE=x-ai/grok-4.1-fast
-```
-
-### 3. Run the Router
+### 4. Run Claude Code
 
 ```bash
-# Using Make (recommended)
-make start             # Start in foreground
-make start-bg          # Start in background
-make stop              # Stop background server
-make status            # Check server status
-make logs              # Show recent logs
-make logs-f            # Follow logs
-
-# Or run directly
-python -m src.main
-
-# Or use the entry point
-open-claude-router
-```
-
-The router will start at `http://localhost:8787`.
-
-### 4. Configure Claude Code
-
-```bash
-export ANTHROPIC_BASE_URL="http://localhost:8787"
-export ANTHROPIC_API_KEY="sk-dummy-key"  # Can be anything if OPENROUTER_API_KEY is set
 claude
 ```
 
-## Docker
+That's it! See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for details on how it works.
 
-### Build and Run
-
-```bash
-# Build the image
-docker build -t open-claude-router .
-
-# Run with environment variables
-docker run -p 8787:8787 \
-  -e OPENROUTER_API_KEY=sk-or-... \
-  -e MODEL_OVERRIDE=x-ai/grok-4.1-fast \
-  open-claude-router
-```
-
-### Docker Compose
+## Router Commands
 
 ```bash
-# Create .env file with your settings
-cp .env.example .env
-# Edit .env with your API key
-
-# Start the service
-docker-compose up -d
-
-# Stop the service
-docker-compose down
+./router start      # Start the router container
+./router stop       # Stop the router
+./router restart    # Restart the router
+./router status     # Check if running
+./router logs       # Show recent logs
+./router logs -f    # Follow logs in real-time
+./router clean      # Remove container and image
 ```
 
-## API Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/` | GET | Health check |
-| `/v1/messages` | POST | Main chat endpoint (Anthropic format) |
-| `/v1/messages/count_tokens` | POST | Token estimation |
-| `/v1/models` | GET | List available models from OpenRouter |
-
-## Configuration Options
+## Configuration
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `OPENROUTER_API_KEY` | OpenRouter API key | None |
-| `OPENROUTER_BASE_URL` | API base URL | `https://openrouter.ai/api/v1` |
-| `MODEL_OVERRIDE` | Force specific model | None |
-| `HOST` | Server host | `0.0.0.0` |
-| `PORT` | Server port | `8787` |
+| `OPENROUTER_API_KEY` | Your OpenRouter API key | Required |
+| `MODEL_OVERRIDE` | Force a specific model for all requests | None |
+| `ROUTER_PORT` | Port to expose the router | `8787` |
+| `OPENROUTER_BASE_URL` | OpenRouter API endpoint | `https://openrouter.ai/api/v1` |
 
-## Development
+### Model Override
 
-### Running Tests
+Force all requests to use a specific model:
 
 ```bash
-# Install dev dependencies
+export MODEL_OVERRIDE="x-ai/grok-3-fast"
+./router start
+```
+
+## Blocking Anthropic Telemetry
+
+To fully block connections to Anthropic servers:
+
+```bash
+sudo tee -a /etc/hosts << 'EOF'
+
+# Block Anthropic telemetry (open-claude-router)
+127.0.0.1 api.anthropic.com
+127.0.0.1 statsig.anthropic.com
+127.0.0.1 sentry.anthropic.com
+EOF
+```
+
+To remove the block:
+
+```bash
+sudo sed -i '/Block Anthropic telemetry/,+4d' /etc/hosts
+```
+
+## Running Without Docker
+
+```bash
+# With Poetry
 poetry install
+poetry run python -m src.main
 
-# Run tests
-poetry run pytest
-
-# Run with coverage
-poetry run pytest --cov=src
+# With Make
+make start          # Foreground
+make start-bg       # Background
+make stop           # Stop
 ```
 
-### Project Structure
+## Troubleshooting
 
-```
-src/
-├── __init__.py
-├── main.py          # FastAPI application
-├── cli.py           # Server management CLI
-├── config.py        # Configuration management
-├── models.py        # Model loading from OpenRouter API
-├── transform.py     # Request/response transformations
-└── stream.py        # SSE streaming handler
+### Claude Code won't start
 
-tests/
-├── test_transform.py  # Unit tests
-└── test_api.py        # Integration tests
+Ensure `~/.claude/settings.json` has the `env` block shown above.
+
+### Router not receiving requests
+
+```bash
+./router status
+curl http://localhost:8787/
 ```
+
+### OpenRouter errors
+
+```bash
+echo $OPENROUTER_API_KEY
+./router logs
+```
+
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md) - How the key faking and API translation works
 
 ## Thanks
 
-Special thanks to these projects that inspired open-claude-router:
-
+Inspired by:
 - [claude-code-router](https://github.com/musistudio/claude-code-router)
 - [claude-code-proxy](https://github.com/kiyo-e/claude-code-proxy)
 

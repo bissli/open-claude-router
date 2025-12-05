@@ -1,7 +1,10 @@
 """FastAPI application for open-claude-router."""
 
+import json
 import logging
+import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import httpx
 import uvicorn
@@ -13,6 +16,9 @@ from .stream import stream_openai_to_anthropic
 from .transform import anthropic_to_openai, count_tokens, openai_to_anthropic
 
 logger = logging.getLogger('uvicorn.error')
+
+# Statsig cache path for serving cached evaluations
+STATSIG_CACHE_DIR = Path.home() / '.claude' / 'statsig'
 
 
 @asynccontextmanager
@@ -174,18 +180,156 @@ async def count_tokens_endpoint(request: Request) -> JSONResponse:
 
 @app.get('/v1/models')
 async def list_models() -> JSONResponse:
-    """List available models from OpenRouter.
+    """List available models in Anthropic format.
 
-    Fetches and caches models from the OpenRouter API. Cache persists for
-    the lifetime of the server process.
+    Fetches models from OpenRouter and converts to Anthropic's format.
 
     Returns
-        JSONResponse with OpenRouter models data structure.
+        JSONResponse with Anthropic-compatible models data structure.
     """
+    from datetime import datetime, timezone
+
     from .models import get_models
 
-    models = await get_models()
-    return JSONResponse(content=models)
+    openrouter_models = await get_models()
+
+    # Convert to Anthropic format
+    anthropic_models = []
+    for model in openrouter_models.get('data', []):
+        # Convert Unix timestamp to RFC 3339
+        created = model.get('created', 0)
+        if created:
+            created_at = datetime.fromtimestamp(created, tz=timezone.utc).isoformat()
+        else:
+            created_at = datetime.now(tz=timezone.utc).isoformat()
+
+        anthropic_models.append({
+            'id': model.get('id', ''),
+            'created_at': created_at,
+            'display_name': model.get('name', model.get('id', '')),
+            'type': 'model',
+        })
+
+    return JSONResponse(content={
+        'data': anthropic_models,
+        'has_more': False,
+        'first_id': anthropic_models[0]['id'] if anthropic_models else None,
+        'last_id': anthropic_models[-1]['id'] if anthropic_models else None,
+    })
+
+
+# ============================================================================
+# Statsig stub endpoints - bypass telemetry validation
+# ============================================================================
+
+def _load_cached_statsig() -> dict | None:
+    """Load cached statsig evaluations if available."""
+    try:
+        for cache_file in STATSIG_CACHE_DIR.glob('statsig.cached.evaluations.*'):
+            with Path(cache_file).open() as f:
+                cached = json.load(f)
+                if 'data' in cached:
+                    return json.loads(cached['data'])
+        return None
+    except Exception as e:
+        logger.warning(f'Failed to load statsig cache: {e}')
+        return None
+
+
+def _make_statsig_response(user: dict | None = None) -> dict:
+    """Generate a valid statsig initialize response."""
+    cached = _load_cached_statsig()
+    if cached:
+        return cached
+
+    # Minimal valid response if no cache
+    return {
+        'feature_gates': {},
+        'dynamic_configs': {},
+        'layer_configs': {},
+        'sdkParams': {},
+        'has_updates': True,
+        'generator': 'open-claude-router',
+        'time': int(time.time() * 1000),
+        'evaluated_keys': user or {},
+        'hash_used': 'djb2',
+    }
+
+
+@app.post('/v1/initialize')
+async def statsig_initialize(request: Request) -> JSONResponse:
+    """Statsig initialize endpoint - returns feature flags."""
+    body = await request.json()
+    user = body.get('user', {})
+    logger.info('Statsig initialize request (stubbed)')
+    return JSONResponse(content=_make_statsig_response(user))
+
+
+@app.post('/v1/log_event')
+async def statsig_log_event(request: Request) -> JSONResponse:
+    """Statsig log event endpoint - accepts and discards events."""
+    logger.debug('Statsig log_event request (stubbed)')
+    return JSONResponse(content={'success': True})
+
+
+@app.post('/v1/rgstr')
+async def statsig_rgstr(request: Request) -> JSONResponse:
+    """Statsig register endpoint - accepts and discards."""
+    logger.debug('Statsig rgstr request (stubbed)')
+    return JSONResponse(content={'success': True})
+
+
+@app.post('/v1/get_id_lists')
+async def statsig_get_id_lists(request: Request) -> JSONResponse:
+    """Statsig ID lists endpoint."""
+    logger.debug('Statsig get_id_lists request (stubbed)')
+    return JSONResponse(content={})
+
+
+# ============================================================================
+# Models endpoints
+# ============================================================================
+
+@app.get('/v1/models/{model_id}')
+async def get_model(model_id: str) -> JSONResponse:
+    """Get a specific model in Anthropic format."""
+    from datetime import datetime, timezone
+
+    from .models import get_models, map_model
+
+    openrouter_models = await get_models()
+
+    # Find the model (also check mapped version)
+    mapped_id = map_model(model_id)
+    for model in openrouter_models.get('data', []):
+        if model.get('id') in {model_id, mapped_id}:
+            created = model.get('created', 0)
+            if created:
+                created_at = datetime.fromtimestamp(created, tz=timezone.utc).isoformat()
+            else:
+                created_at = datetime.now(tz=timezone.utc).isoformat()
+
+            return JSONResponse(content={
+                'id': model.get('id', ''),
+                'created_at': created_at,
+                'display_name': model.get('name', model.get('id', '')),
+                'type': 'model',
+            })
+
+    # Return a synthetic model if not found (allows any model to be "valid")
+    return JSONResponse(content={
+        'id': model_id,
+        'created_at': datetime.now(tz=timezone.utc).isoformat(),
+        'display_name': model_id,
+        'type': 'model',
+    })
+
+
+@app.api_route('/{path:path}', methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH'])
+async def catch_all(path: str, request: Request):
+    """Handle unimplemented endpoints gracefully."""
+    logger.debug(f'Unhandled: {request.method} /{path}')
+    return JSONResponse(status_code=404, content={'error': {'message': f'Not found: /{path}'}})
 
 
 def run() -> None:

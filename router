@@ -3,13 +3,12 @@
 # open-claude-router - Manage the router Docker container
 #
 # Usage:
-#   router.sh start    Start the router (builds image if needed)
-#   router.sh stop     Stop the router
-#   router.sh restart  Restart the router
-#   router.sh status   Check if running
-#   router.sh logs     Show recent logs
-#   router.sh logs -f  Follow logs
-#   router.sh clean    Remove container and image
+#   router start       Start the router
+#   router stop        Stop the router
+#   router restart     Restart the router
+#   router status      Check if running
+#   router logs [-f]   Show recent logs (or follow with -f)
+#   router clean       Remove container and image
 #
 
 CONTAINER_NAME="open-claude-router"
@@ -115,6 +114,14 @@ clean() {
 
 usage() {
     echo "Usage: $0 {start|stop|restart|status|logs [-f]|clean}"
+    echo ""
+    echo "Commands:"
+    echo "  start      Start the router"
+    echo "  stop       Stop the router"
+    echo "  restart    Restart the router"
+    echo "  status     Check if running"
+    echo "  logs [-f]  Show logs (or follow with -f)"
+    echo "  clean      Remove container and image"
     echo ""
     echo "Environment variables:"
     echo "  OPENROUTER_API_KEY    Your OpenRouter API key (required)"
