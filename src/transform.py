@@ -62,7 +62,7 @@ def _validate_tool_calls(messages: list[dict]) -> list[dict]:
     return validated
 
 
-ALWAYS_ALLOWED = {'model', 'messages', 'stream'}
+ALWAYS_ALLOWED = {'model', 'messages', 'stream', 'stream_options'}
 
 
 def _filter_unsupported_params(request: dict, model: str) -> dict:
@@ -181,6 +181,10 @@ def anthropic_to_openai(body: dict, model_override: str | None = None) -> dict:
         'messages': system_messages + _validate_tool_calls(openai_messages),
         'stream': stream,
     }
+
+    # Request usage stats in streaming responses
+    if stream:
+        result['stream_options'] = {'include_usage': True}
 
     if temperature is not None:
         result['temperature'] = temperature
