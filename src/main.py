@@ -131,7 +131,7 @@ async def messages(
                         return
 
                     async for chunk in stream_openai_to_anthropic(
-                        response, openai_request['model'], estimated_input_tokens
+                        response, requested_model, estimated_input_tokens
                     ):
                         yield chunk
 
@@ -160,7 +160,7 @@ async def messages(
                 )
 
             openai_data = response.json()
-            anthropic_response = openai_to_anthropic(openai_data, openai_request['model'])
+            anthropic_response = openai_to_anthropic(openai_data, requested_model)
             return JSONResponse(content=anthropic_response)
 
 
@@ -327,7 +327,7 @@ async def get_model(model_id: str) -> JSONResponse:
                 created_at = datetime.now(tz=timezone.utc).isoformat()
 
             return JSONResponse(content={
-                'id': model.get('id', ''),
+                'id': model_id,  # Return the original requested ID, not OpenRouter's
                 'created_at': created_at,
                 'display_name': model.get('name', model.get('id', '')),
                 'type': 'model',

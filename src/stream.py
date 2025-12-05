@@ -37,7 +37,12 @@ async def stream_openai_to_anthropic(
             'model': model,
             'stop_reason': None,
             'stop_sequence': None,
-            'usage': {'input_tokens': input_tokens, 'output_tokens': 1},
+            'usage': {
+                'input_tokens': input_tokens,
+                'cache_creation_input_tokens': 0,
+                'cache_read_input_tokens': 0,
+                'output_tokens': 1,
+            },
         },
     })
 
@@ -175,15 +180,19 @@ async def stream_openai_to_anthropic(
     if is_tool_use or has_started_text_block or has_started_thinking_block:
         yield close_current_block()
 
-    yield _sse_event('message_delta', {
+    output_tokens = usage.get('completion_tokens', 0)
+    final_input_tokens = usage.get('prompt_tokens', input_tokens)
+
+    message_delta_event = {
         'type': 'message_delta',
         'delta': {
             'stop_reason': 'tool_use' if is_tool_use else 'end_turn',
             'stop_sequence': None,
         },
         'usage': {
-            'output_tokens': usage.get('completion_tokens', 0),
+            'input_tokens': final_input_tokens,
+            'output_tokens': output_tokens,
         },
-    })
-
+    }
+    yield _sse_event('message_delta', message_delta_event)
     yield _sse_event('message_stop', {'type': 'message_stop'})
