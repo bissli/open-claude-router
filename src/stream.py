@@ -15,8 +15,16 @@ def _sse_event(event_type: str, data: dict) -> str:
     return f'event: {event_type}\ndata: {json.dumps(data)}\n\n'
 
 
-async def stream_openai_to_anthropic(response: httpx.Response, model: str) -> AsyncIterator[str]:
-    """Transform OpenAI streaming response to Anthropic SSE format."""
+async def stream_openai_to_anthropic(
+    response: httpx.Response, model: str, input_tokens: int = 0
+) -> AsyncIterator[str]:
+    """Transform OpenAI streaming response to Anthropic SSE format.
+
+    Args:
+        response: The httpx streaming response from OpenRouter
+        model: The model name to include in the response
+        input_tokens: Estimated input token count for message_start
+    """
     message_id = f'msg_{int(time.time() * 1000)}'
 
     yield _sse_event('message_start', {
@@ -29,7 +37,7 @@ async def stream_openai_to_anthropic(response: httpx.Response, model: str) -> As
             'model': model,
             'stop_reason': None,
             'stop_sequence': None,
-            'usage': {'input_tokens': 0, 'output_tokens': 0},
+            'usage': {'input_tokens': input_tokens, 'output_tokens': 1},
         },
     })
 
@@ -174,7 +182,6 @@ async def stream_openai_to_anthropic(response: httpx.Response, model: str) -> As
             'stop_sequence': None,
         },
         'usage': {
-            'input_tokens': usage.get('prompt_tokens', 0),
             'output_tokens': usage.get('completion_tokens', 0),
         },
     })

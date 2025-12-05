@@ -112,6 +112,9 @@ async def messages(
     url = f'{config.openrouter_base_url}/chat/completions'
 
     if is_streaming:
+        # Estimate input tokens for message_start event
+        estimated_input_tokens = count_tokens(body)
+
         async def generate():
             async with httpx.AsyncClient(timeout=300.0) as client:
                 async with client.stream(
@@ -128,7 +131,7 @@ async def messages(
                         return
 
                     async for chunk in stream_openai_to_anthropic(
-                        response, openai_request['model']
+                        response, openai_request['model'], estimated_input_tokens
                     ):
                         yield chunk
 
